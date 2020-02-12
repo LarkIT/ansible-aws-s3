@@ -1,0 +1,4 @@
+# roles/aws-s3/defaults/main.yml
+# Default parameters for aws-s3 role
+
+s3_bucket_transfer_acceleration_enabled: false

@@ -1,0 +1,63 @@
+# tasks/main.yml
+# Create encrypted S3 bucket and IAM user and policy with permissions to use associated KMS key
+---
+- name: Lookup KMS key info
+  aws_kms_info:
+    filters:
+      alias: "{{ s3_kms_key_name }}"
+  register: kms_key_info
+
+- name: Create S3 bucket
+  aws_s3:
+    bucket: "{{ s3_bucket_name }}"
+    mode: create
+    permission: private
+
+- name: Enable S3 default encryption
+  command: >
+    aws s3api put-bucket-encryption
+    --bucket "{{ s3_bucket_name }}"
+    --server-side-encryption-configuration "{{lookup( 'template', 's3-server-side-encryption-configuration.json.j2')}}"
+
+- name: Create directory in S3 bucket
+  aws_s3:
+    bucket: "{{ s3_bucket_name }}"
+    mode: create
+    object: "{{ subdirectory }}"
+  loop: "{{ s3_bucket_subfolders }}"
+  loop_control:
+    loop_var: subdirectory
+  when: s3_bucket_subfolders is defined
+
+- name: Confgure S3 bucket public accesss
+  command: > 
+    aws s3api put-public-access-block 
+    --bucket {{ s3_bucket_name|quote }}
+    --public-access-block-configuration BlockPublicAcls={{ s3_BlockPublicAcls|quote }},IgnorePublicAcls={{ s3_IgnorePublicAcls|quote }},BlockPublicPolicy={{ s3_BlockPublicPolicy|quote }},RestrictPublicBuckets={{ s3_RestrictPublicBuckets|quote }}
+  when: s3_BlockPublicAcls is defined and s3_IgnorePublicAcls is defined and s3_BlockPublicPolicy is defined and s3_RestrictPublicBuckets is defined
+
+- name: Configure S3 bucket transfer acceleration
+  command: >
+    aws s3api put-bucket-accelerate-configuration 
+    --bucket {{ s3_bucket_name|quote }} 
+    --accelerate-configuration Status=Enabled
+  when: s3_bucket_transfer_acceleration_enabled
+
+- name: Create IAM user for s3 bucket
+  iam_user:
+    name: "{{ s3_iam_user_name }}"
+    state: present
+
+- name: Create IAM policy for s3 bucket
+  iam_policy:
+    iam_type: user
+    iam_name: "{{ s3_iam_user_name }}"
+    policy_name: "{{ s3_iam_policy_name }}"
+    state: present
+    policy_json: "{{ lookup( 'template', 's3-policy.json.j2') }}"
+
+
+
+
+
+
