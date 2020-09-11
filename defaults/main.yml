@@ -1,4 +1,11 @@
 # roles/aws-s3/defaults/main.yml
 # Default parameters for aws-s3 role
-
 s3_bucket_transfer_acceleration_enabled: false
+s3_bucket_versioning_enabled: false
+s3_bucket_logging_enabled: false
+s3_bucket_mode: create
+s3_bucket_permission: private
+s3_BlockPublicAcls: true
+s3_IgnorePublicAcls: true
+s3_BlockPublicPolicy: true
+s3_RestrictPublicBuckets: true

@@ -10,8 +10,8 @@
 - name: Create S3 bucket
   aws_s3:
     bucket: "{{ s3_bucket_name }}"
-    mode: create
-    permission: private
+    mode: "{{ s3_bucket_mode }}"
+    permission: "{{ s3_bucket_permission }}"
 
 - name: Enable S3 default encryption
   command: >
@@ -22,7 +22,7 @@
 - name: Create directory in S3 bucket
   aws_s3:
     bucket: "{{ s3_bucket_name }}"
-    mode: create
+    mode: "{{ s3_bucket_mode }}"
     object: "{{ subdirectory }}"
   loop: "{{ s3_bucket_subfolders }}"
   loop_control:
@@ -43,6 +43,38 @@
     --accelerate-configuration Status=Enabled
   when: s3_bucket_transfer_acceleration_enabled
 
+- name: Configure S3 bucket access logging
+  block: 
+    - name: Create logging bucket
+      aws_s3:
+        bucket: "{{ s3_bucket_name }}-logs"
+        mode: "{{ s3_bucket_mode }}"
+        permission: "{{ s3_bucket_permission }}"
+    - name: Confgure logging bucket public accesss
+      command: > 
+        aws s3api put-public-access-block 
+        --bucket {{ s3_bucket_name}}-logs
+        --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+    - name: Grant permissions to S3 service on logging bucket
+      command: >
+        aws s3api put-bucket-acl 
+        --bucket "{{ s3_bucket_name }}-logs" 
+        --grant-write URI=http://acs.amazonaws.com/groups/s3/LogDelivery 
+        --grant-read-acp URI=http://acs.amazonaws.com/groups/s3/LogDelivery
+    - name: Configure logging on target bucket
+      command: >
+        aws s3api put-bucket-logging 
+        --bucket {{ s3_bucket_name }} 
+        --bucket-logging-status "{{lookup( 'template', 's3-logging-configuration.json.j2')}}"
+  when: s3_bucket_logging_enabled
+
+- name: Enable bucket versioning
+  command: >
+    aws s3api put-bucket-versioning 
+    --bucket "{{ s3_bucket_name }}" 
+    --versioning-configuration Status=Enabled
+  when: s3_bucket_versioning_enabled
+
 - name: Create IAM user for s3 bucket
   iam_user:
     name: "{{ s3_iam_user_name }}"
@@ -55,9 +87,3 @@
     policy_name: "{{ s3_iam_policy_name }}"
     state: present
     policy_json: "{{ lookup( 'template', 's3-policy.json.j2') }}"
-
-
-
-
-
-
